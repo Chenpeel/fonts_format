@@ -104,7 +104,7 @@ def process_pptx(path: Path, out_dir: Path, fonts: dict, log: Callable) -> Path:
                     for cell in row.cells:
                         for para in cell.text_frame.paragraphs:
                             _pptx_para(para._p, fonts)
-    out = out_dir / f'{path.stem}_font_fixed{path.suffix}'
+    out = out_dir / f'{path.stem}_font_formated{path.suffix}'
     prs.save(out)
     return out
 

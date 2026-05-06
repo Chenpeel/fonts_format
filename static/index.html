@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Office 字体标准化工具</title>
+<style>
+:root {
+  --bg:       #0d1117;
+  --surface:  #161b22;
+  --border:   #30363d;
+  --accent:   #388bfd;
+  --accent-h: #58a6ff;
+  --text:     #e6edf3;
+  --muted:    #8b949e;
+  --success:  #3fb950;
+  --error:    #f85149;
+  --radius:   10px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+header {
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+header h1 { font-size: 16px; font-weight: 600; }
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  grid-template-rows: auto 1fr;
+  gap: 16px;
+  padding: 20px 24px;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+/* ── 上传区 ── */
+#drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 36px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+#drop-zone.over, #drop-zone:hover {
+  border-color: var(--accent);
+  background: rgba(56,139,253,.05);
+}
+#drop-zone svg { margin-bottom: 10px; }
+#drop-zone p   { color: var(--muted); font-size: 14px; margin-top: 6px; }
+#drop-zone span { color: var(--accent); }
+/* ── 文件列表 ── */
+#file-list { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+}
+.file-row .name  { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-row .badge {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(56,139,253,.15);
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.file-row .status { font-size: 13px; min-width: 18px; text-align: center; }
+.file-row .rm {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+  transition: color .15s;
+}
+.file-row .rm:hover { color: var(--error); }
+/* ── 右侧设置 ── */
+.settings-grid { display: flex; flex-direction: column; gap: 14px; }
+.setting-row   { display: flex; flex-direction: column; gap: 5px; }
+.setting-row label { font-size: 12px; color: var(--muted); }
+.setting-row input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  padding: 8px 10px;
+  width: 100%;
+  transition: border-color .15s;
+}
+.setting-row input:focus { outline: none; border-color: var(--accent); }
+/* ── 进度 & 操作 ── */
+#action-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+#progress-wrap {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+#progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width .3s;
+}
+#status-text { font-size: 13px; color: var(--muted); min-width: 80px; text-align: right; }
+#btn-process {
+  padding: 9px 24px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+  white-space: nowrap;
+}
+#btn-process:hover:not(:disabled) { background: var(--accent-h); }
+#btn-process:disabled { opacity: .5; cursor: not-allowed; }
+/* ── 日志 ── */
+#log-card { grid-column: 1 / -1; }
+#log {
+  font-family: 'JetBrains Mono', 'Cascadia Code', monospace;
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  max-height: 220px;
+  overflow-y: auto;
+  line-height: 1.8;
+}
+.log-ok   { color: var(--success); }
+.log-err  { color: var(--error); }
+.log-info { color: var(--muted); }
+/* ── 下载区 ── */
+#results { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+}
+.result-row a {
+  padding: 5px 14px;
+  background: rgba(63,185,80,.15);
+  color: var(--success);
+  text-decoration: none;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background .15s;
+}
+.result-row a:hover { background: rgba(63,185,80,.28); }
+/* ── 响应式 ── */
+@media (max-width: 700px) {
+  main { grid-template-columns: 1fr; }
+  #action-bar { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📄 Office 字体标准化工具</h1>
+  <span style="color:var(--muted);font-size:13px">中文→宋体 &nbsp;|&nbsp; 英文→Times New Roman &nbsp;|&nbsp; 日文→MS Mincho</span>
+</header>
+
+<main>
+  <!-- 左：上传 + 文件列表 -->
+  <div class="card" style="grid-row: 1 / 3;">
+    <div id="drop-zone">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5">
+        <path d="M12 15V3m0 0L8 7m4-4l4 4"/><rect x="2" y="17" width="20" height="4" rx="1"/>
+      </svg>
+      <h3 style="font-size:15px">拖拽文件到此处</h3>
+      <p>或 <span>点击选择文件</span></p>
+      <p style="margin-top:8px">支持 .pptx &nbsp;.docx &nbsp;.xlsx</p>
+    </div>
+    <input type="file" id="file-input" multiple accept=".pptx,.docx,.xlsx" style="display:none">
+    <div id="file-list"></div>
+  </div>
+
+  <!-- 右：字体设置 -->
+  <div class="card">
+    <h3 style="font-size:14px;margin-bottom:16px;color:var(--muted)">⚙ 字体规则</h3>
+    <div class="settings-grid">
+      <div class="setting-row">
+        <label>中文字体</label>
+        <input id="font-chinese" value="宋体" />
+      </div>
+      <div class="setting-row">
+        <label>英文 / 数字字体</label>
+        <input id="font-latin" value="Times New Roman" />
+      </div>
+      <div class="setting-row">
+        <label>日文字体</label>
+        <input id="font-japanese" value="MS Mincho" />
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作栏 -->
+  <div id="action-bar" class="card" style="grid-column: 2; padding: 14px 20px;">
+    <div id="progress-wrap"><div id="progress-bar"></div></div>
+    <span id="status-text">0 个文件</span>
+    <button id="btn-process" disabled>▶ 开始处理</button>
+  </div>
+
+  <!-- 日志 -->
+  <div id="log-card" class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 style="font-size:14px;color:var(--muted)">📋 处理日志</h3>
+      <button onclick="clearLog()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px">清空</button>
+    </div>
+    <div id="log"></div>
+    <div id="results"></div>
+  </div>
+</main>
+
+<script>
+const state = { files: [] }  // [{id, name, ext}]
+
+// ── 拖拽 & 选择 ────────────────────────────────────────────────────────────
+const dropZone  = document.getElementById('drop-zone')
+const fileInput = document.getElementById('file-input')
+
+dropZone.addEventListener('click', () => fileInput.click())
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('over') })
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'))
+dropZone.addEventListener('drop', e => {
+  e.preventDefault()
+  dropZone.classList.remove('over')
+  uploadFiles([...e.dataTransfer.files])
+})
+fileInput.addEventListener('change', () => { uploadFiles([...fileInput.files]); fileInput.value = '' })
+
+// ── 上传 ───────────────────────────────────────────────────────────────────
+async function uploadFiles(files) {
+  const allowed = files.filter(f => /\.(pptx|docx|xlsx)$/i.test(f.name))
+  if (!allowed.length) return
+  const fd = new FormData()
+  allowed.forEach(f => fd.append('files', f))
+  const res  = await fetch('/api/upload', { method: 'POST', body: fd })
+  const list = await res.json()
+  list.forEach(item => {
+    if (!state.files.find(f => f.name === item.name)) {
+      state.files.push(item)
+    }
+  })
+  renderFileList()
+  updateBtn()
+}
+
+function renderFileList() {
+  const el = document.getElementById('file-list')
+  el.innerHTML = ''
+  state.files.forEach(item => {
+    const row = document.createElement('div')
+    row.className = 'file-row'
+    row.id = `row-${item.id}`
+    row.innerHTML = `
+      <span class="badge">${item.ext.slice(1)}</span>
+      <span class="name" title="${item.name}">${item.name}</span>
+      <span class="status" id="st-${item.id}">⏳</span>
+      <button class="rm" title="移除" onclick="removeFile('${item.id}')">✕</button>
+    `
+    el.appendChild(row)
+  })
+}
+
+function removeFile(id) {
+  state.files = state.files.filter(f => f.id !== id)
+  renderFileList()
+  updateBtn()
+}
+
+function updateBtn() {
+  const btn = document.getElementById('btn-process')
+  const txt = document.getElementById('status-text')
+  btn.disabled = state.files.length === 0
+  txt.textContent = `${state.files.length} 个文件`
+}
+
+// ── 处理 ───────────────────────────────────────────────────────────────────
+document.getElementById('btn-process').addEventListener('click', startProcess)
+
+async function startProcess() {
+  const btn = document.getElementById('btn-process')
+  btn.disabled = true
+  btn.textContent = '处理中…'
+  document.getElementById('results').innerHTML = ''
+  setProgress(0)
+
+  const fonts = {
+    chinese:  document.getElementById('font-chinese').value.trim()  || '宋体',
+    latin:    document.getElementById('font-latin').value.trim()    || 'Times New Roman',
+    japanese: document.getElementById('font-japanese').value.trim() || 'MS Mincho',
+  }
+
+  const res = await fetch('/api/process', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files: state.files, ...fonts }),
+  })
+
+  const reader  = res.body.getReader()
+  const decoder = new TextDecoder()
+  let   buf     = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const parts = buf.split('\n\n')
+    buf = parts.pop()
+    for (const chunk of parts) {
+      for (const line of chunk.split('\n')) {
+        if (line.startsWith('data: ')) {
+          handleEvent(JSON.parse(line.slice(6)))
+        }
+      }
+    }
+  }
+}
+
+function handleEvent(ev) {
+  const total = ev.total || state.files.length
+  switch (ev.type) {
+    case 'start':
+      setProgress(ev.index / total)
+      document.getElementById('status-text').textContent = `${ev.index + 1} / ${total}`
+      setStatus(ev.name, '⚙️')
+      appendLog(`处理: ${ev.name}`, 'info')
+      break
+    case 'done':
+      setStatus(ev.name, '✅')
+      appendLog(`✓ ${ev.name}`, 'ok')
+      appendResult(ev.name, ev.did)
+      break
+    case 'error':
+      setStatus(ev.name, '❌')
+      appendLog(`✗ ${ev.name}: ${ev.msg}`, 'err')
+      break
+    case 'complete':
+      setProgress(1)
+      document.getElementById('status-text').textContent = '完成 ✓'
+      appendLog('── 全部处理完成 ──', 'info')
+      const btn = document.getElementById('btn-process')
+      btn.disabled = false
+      btn.textContent = '▶ 开始处理'
+      break
+  }
+}
+
+// ── UI 工具 ────────────────────────────────────────────────────────────────
+function setProgress(v) {
+  document.getElementById('progress-bar').style.width = `${Math.round(v * 100)}%`
+}
+
+function setStatus(name, icon) {
+  const item = state.files.find(f => f.name === name)
+  if (!item) return
+  const el = document.getElementById(`st-${item.id}`)
+  if (el) el.textContent = icon
+}
+
+function appendLog(msg, cls = '') {
+  const log = document.getElementById('log')
+  const line = document.createElement('div')
+  line.className = `log-${cls}`
+  line.textContent = msg
+  log.appendChild(line)
+  log.scrollTop = log.scrollHeight
+}
+
+function appendResult(name, did) {
+  const res = document.getElementById('results')
+  const row = document.createElement('div')
+  row.className = 'result-row'
+  const stem = name.replace(/\.[^.]+$/, '')
+  const ext  = name.match(/\.[^.]+$/)?.[0] || ''
+  row.innerHTML = `
+    <span>${stem}<strong>_font_fixed</strong>${ext}</span>
+    <a href="/api/download/${encodeURIComponent(did)}" download>⬇ 下载</a>
+  `
+  res.appendChild(row)
+}
+
+function clearLog() {
+  document.getElementById('log').innerHTML = ''
+  document.getElementById('results').innerHTML = ''
+}
+</script>
+</body>
+</html>

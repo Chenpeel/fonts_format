@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    ports:
+      - "9090:5000"
+    volumes:
+      - fonts_tmp:/tmp/fonts-format
+    restart: unless-stopped
+
+volumes:
+  fonts_tmp:
